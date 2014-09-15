@@ -29,12 +29,19 @@ import org.apache.ibatis.session.Configuration;
 /**
  * @author Clinton Begin
  */
+/**
+ * 动态上下文
+ * 
+ */
 public class DynamicContext {
 
   public static final String PARAMETER_OBJECT_KEY = "_parameter";
   public static final String DATABASE_ID_KEY = "_databaseId";
 
   static {
+    //TODO OgnlRuntime
+    //定义属性->getter方法映射，ContextMap到ContextAccessor的映射，注册到ognl运行时
+	//参考http://commons.apache.org/proper/commons-ognl/developer-guide.html
     OgnlRuntime.setPropertyAccessor(ContextMap.class, new ContextAccessor());
   }
 
@@ -43,7 +50,9 @@ public class DynamicContext {
   private int uniqueNumber = 0;
 
   public DynamicContext(Configuration configuration, Object parameterObject) {
+	  //绝大多数调用的地方parameterObject为null
     if (parameterObject != null && !(parameterObject instanceof Map)) {
+    	//如果是map型
       MetaObject metaObject = configuration.newMetaObject(parameterObject);
       bindings = new ContextMap(metaObject);
     } else {
@@ -74,6 +83,7 @@ public class DynamicContext {
     return uniqueNumber++;
   }
 
+  //上下文map，静态内部类
   static class ContextMap extends HashMap<String, Object> {
     private static final long serialVersionUID = 2977601501966151582L;
 
@@ -90,10 +100,13 @@ public class DynamicContext {
     @Override
     public Object get(Object key) {
       String strKey = (String) key;
+      //先去map里找
       if (super.containsKey(strKey)) {
         return super.get(strKey);
       }
 
+      //如果没找到，再用ognl表达式去取值
+      //如person[0].birthdate.year
       if (parameterMetaObject != null) {
         Object object = parameterMetaObject.getValue(strKey);
         // issue #61 do not modify the context when reading
@@ -108,6 +121,7 @@ public class DynamicContext {
     }
   }
 
+  //上下文访问器，静态内部类,实现OGNL的PropertyAccessor
   static class ContextAccessor implements PropertyAccessor {
 
     public Object getProperty(Map context, Object target, Object name)

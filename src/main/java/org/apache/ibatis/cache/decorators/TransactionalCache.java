@@ -24,15 +24,24 @@ import org.apache.ibatis.cache.Cache;
 /**
  * @author Clinton Begin
  */
+/**
+ * 事务缓存
+ * 一次性存入多个缓存，移除多个缓存
+ *
+ */
 public class TransactionalCache implements Cache {
 
   private Cache delegate;
+  //commit时要不要清缓存
   private boolean clearOnCommit;
+  //commit时要添加的元素
   private Map<Object, AddEntry> entriesToAddOnCommit;
+  //commit时要移除的元素
   private Map<Object, RemoveEntry> entriesToRemoveOnCommit;
 
   public TransactionalCache(Cache delegate) {
     this.delegate = delegate;
+    //默认commit时不清缓存
     this.clearOnCommit = false;
     this.entriesToAddOnCommit = new HashMap<Object, AddEntry>();
     this.entriesToRemoveOnCommit = new HashMap<Object, RemoveEntry>();
@@ -61,12 +70,14 @@ public class TransactionalCache implements Cache {
 
   @Override
   public void putObject(Object key, Object object) {
+    //如果又有删，又有加这个key，则只记录加，看谁最后调用
     entriesToRemoveOnCommit.remove(key);
     entriesToAddOnCommit.put(key, new AddEntry(delegate, key, object));
   }
 
   @Override
   public Object removeObject(Object key) {
+    //如果又有删，又有加这个key，则只记录删，看谁最后调用
     entriesToAddOnCommit.remove(key);
     entriesToRemoveOnCommit.put(key, new RemoveEntry(delegate, key));
     return delegate.getObject(key);
@@ -78,14 +89,17 @@ public class TransactionalCache implements Cache {
     clearOnCommit = true;
   }
 
+  //多了commit方法，提供事务功能
   public void commit() {
     if (clearOnCommit) {
       delegate.clear();
     } else {
+        //commit时要移除的元素
       for (RemoveEntry entry : entriesToRemoveOnCommit.values()) {
         entry.commit();
       }
     }
+    //commit时要添加的元素
     for (AddEntry entry : entriesToAddOnCommit.values()) {
       entry.commit();
     }

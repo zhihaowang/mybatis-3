@@ -23,6 +23,11 @@ import java.util.List;
 /**
  * @author Clinton Begin
  */
+/**
+ * 缓存key
+ * 一般缓存框架的数据结构基本上都是 Key-Value 方式存储，
+ * MyBatis 对于其 Key 的生成采取规则为：[hashcode : checksum : mappedStementId : offset : limit : executeSql : queryParams]
+ */
 public class CacheKey implements Cloneable, Serializable {
 
   private static final long serialVersionUID = 1146682552656046210L;
@@ -45,6 +50,7 @@ public class CacheKey implements Cloneable, Serializable {
     this.updateList = new ArrayList<Object>();
   }
 
+  //传入一个Object数组，更新hashcode和效验码
   public CacheKey(Object[] objects) {
     this();
     updateAll(objects);
@@ -56,17 +62,20 @@ public class CacheKey implements Cloneable, Serializable {
 
   public void update(Object object) {
     if (object != null && object.getClass().isArray()) {
+        //如果是数组，则循环调用doUpdate
       int length = Array.getLength(object);
       for (int i = 0; i < length; i++) {
         Object element = Array.get(object, i);
         doUpdate(element);
       }
     } else {
+        //否则，doUpdate
       doUpdate(object);
     }
   }
 
   private void doUpdate(Object object) {
+      //计算hash值，校验码
     int baseHashCode = object == null ? 1 : object.hashCode();
 
     count++;

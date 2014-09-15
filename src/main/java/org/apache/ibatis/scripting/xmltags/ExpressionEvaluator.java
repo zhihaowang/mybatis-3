@@ -26,20 +26,34 @@ import org.apache.ibatis.builder.BuilderException;
 /**
  * @author Clinton Begin
  */
+/**
+ * 表达式求值器
+ * 可参考ExpressionEvaluatorTest
+ */
 public class ExpressionEvaluator {
 
+  //表达式求布尔值，比如username == 'cbegin'
   public boolean evaluateBoolean(String expression, Object parameterObject) {
+	//非常简单，就是调用ognl
     Object value = OgnlCache.getValue(expression, parameterObject);
+    //如果是Boolean
     if (value instanceof Boolean) return (Boolean) value;
+    //如果是Number，判断不为0
     if (value instanceof Number) return !new BigDecimal(String.valueOf(value)).equals(BigDecimal.ZERO);
+    //否则判断不为null
     return value != null;
   }
 
+  //解析表达式到一个Iterable,核心是ognl
   public Iterable<?> evaluateIterable(String expression, Object parameterObject) {
+	//原生的ognl很强大，OgnlCache.getValue直接就可以返回一个Iterable型或数组型或Map型了
     Object value = OgnlCache.getValue(expression, parameterObject);
     if (value == null) throw new BuilderException("The expression '" + expression + "' evaluated to a null value.");
     if (value instanceof Iterable) return (Iterable<?>) value;
     if (value.getClass().isArray()) {
+    	//如果是array，则把他变成一个List<Object>
+    	//注释下面提到了，不能用Arrays.asList()，因为array可能是基本型，这样会出ClassCastException，
+    	//见https://code.google.com/p/mybatis/issues/detail?id=209
         // the array may be primitive, so Arrays.asList() may throw
         // a ClassCastException (issue 209).  Do the work manually
         // Curse primitives! :) (JGB)

@@ -50,10 +50,16 @@ import org.apache.ibatis.type.TypeHandler;
 /**
  * @author Clinton Begin
  */
+/**
+ * XML映射构建器，建造者模式,继承BaseBuilder
+ *
+ */
 public class XMLMapperBuilder extends BaseBuilder {
 
   private XPathParser parser;
+  //映射器构建助手
   private MapperBuilderAssistant builderAssistant;
+  //用来存放sql片段的哈希表
   private Map<String, XNode> sqlFragments;
   private String resource;
 
@@ -87,10 +93,15 @@ public class XMLMapperBuilder extends BaseBuilder {
     this.resource = resource;
   }
 
+  //解析
   public void parse() {
+    //如果没有加载过再加载，防止重复加载
     if (!configuration.isResourceLoaded(resource)) {
+      //配置mapper
       configurationElement(parser.evalNode("/mapper"));
+      //标记一下，已经加载过了
       configuration.addLoadedResource(resource);
+      //绑定映射器到namespace
       bindMapperForNamespace();
     }
 
@@ -103,8 +114,15 @@ public class XMLMapperBuilder extends BaseBuilder {
     return sqlFragments.get(refid);
   }
 
+	//配置mapper元素
+//	<mapper namespace="org.mybatis.example.BlogMapper">
+//	  <select id="selectBlog" parameterType="int" resultType="Blog">
+//	    select * from Blog where id = #{id}
+//	  </select>
+//	</mapper>
   private void configurationElement(XNode context) {
     try {
+      //1.配置namespace
       String namespace = context.getStringAttribute("namespace");
       if (namespace.equals("")) {
         throw new BuilderException("Mapper's namespace cannot be empty");
