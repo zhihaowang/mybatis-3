@@ -36,6 +36,10 @@ import org.apache.ibatis.session.Configuration;
 /**
  * @author Clinton Begin
  */
+/**
+ * XML语句构建器，建造者模式,继承BaseBuilder
+ *
+ */
 public class XMLStatementBuilder extends BaseBuilder {
 
   private MapperBuilderAssistant builderAssistant;
@@ -53,35 +57,64 @@ public class XMLStatementBuilder extends BaseBuilder {
     this.requiredDatabaseId = databaseId;
   }
 
+  //解析语句(select|insert|update|delete)
+//<select
+//  id="selectPerson"
+//  parameterType="int"
+//  parameterMap="deprecated"
+//  resultType="hashmap"
+//  resultMap="personResultMap"
+//  flushCache="false"
+//  useCache="true"
+//  timeout="10000"
+//  fetchSize="256"
+//  statementType="PREPARED"
+//  resultSetType="FORWARD_ONLY">
+//  SELECT * FROM PERSON WHERE ID = #{id}
+//</select>
   public void parseStatementNode() {
     String id = context.getStringAttribute("id");
     String databaseId = context.getStringAttribute("databaseId");
 
+    //如果databaseId不匹配，退出
     if (!databaseIdMatchesCurrent(id, databaseId, this.requiredDatabaseId)) return;
 
+    //暗示驱动程序每次批量返回的结果行数
     Integer fetchSize = context.getIntAttribute("fetchSize");
+    //超时时间
     Integer timeout = context.getIntAttribute("timeout");
+    //引用外部 parameterMap,已废弃
     String parameterMap = context.getStringAttribute("parameterMap");
+    //参数类型
     String parameterType = context.getStringAttribute("parameterType");
     Class<?> parameterTypeClass = resolveClass(parameterType);
+    //引用外部的 resultMap(高级功能)
     String resultMap = context.getStringAttribute("resultMap");
+    //结果类型
     String resultType = context.getStringAttribute("resultType");
+    //脚本语言,mybatis3.2的新功能
     String lang = context.getStringAttribute("lang");
+    //得到语言驱动
     LanguageDriver langDriver = getLanguageDriver(lang);
 
     Class<?> resultTypeClass = resolveClass(resultType);
+    //结果集类型，FORWARD_ONLY|SCROLL_SENSITIVE|SCROLL_INSENSITIVE 中的一种
     String resultSetType = context.getStringAttribute("resultSetType");
+    //语句类型, STATEMENT|PREPARED|CALLABLE 的一种
     StatementType statementType = StatementType.valueOf(context.getStringAttribute("statementType", StatementType.PREPARED.toString()));
     ResultSetType resultSetTypeEnum = resolveResultSetType(resultSetType);
 
+    //获取命令类型(select|insert|update|delete)
     String nodeName = context.getNode().getNodeName();
     SqlCommandType sqlCommandType = SqlCommandType.valueOf(nodeName.toUpperCase(Locale.ENGLISH));
     boolean isSelect = sqlCommandType == SqlCommandType.SELECT;
     boolean flushCache = context.getBooleanAttribute("flushCache", !isSelect);
+    //是否要缓存select结果
     boolean useCache = context.getBooleanAttribute("useCache", isSelect);
     boolean resultOrdered = context.getBooleanAttribute("resultOrdered", false);
 
     // Include Fragments before parsing
+    //解析之前先include SQL片段
     XMLIncludeTransformer includeParser = new XMLIncludeTransformer(configuration, builderAssistant);
     includeParser.applyIncludes(context.getNode());
 
@@ -91,7 +124,9 @@ public class XMLStatementBuilder extends BaseBuilder {
     // Parse the SQL (pre: <selectKey> and <include> were parsed and removed)
     SqlSource sqlSource = langDriver.createSqlSource(configuration, context, parameterTypeClass);
     String resultSets = context.getStringAttribute("resultSets");
+    //(仅对 insert 有用) 标记一个属性, MyBatis 会通过 getGeneratedKeys 或者通过 insert 语句的 selectKey 子元素设置它的值
     String keyProperty = context.getStringAttribute("keyProperty");
+    //(仅对 insert 有用) 标记一个属性, MyBatis 会通过 getGeneratedKeys 或者通过 insert 语句的 selectKey 子元素设置它的值
     String keyColumn = context.getStringAttribute("keyColumn");
     KeyGenerator keyGenerator;
     String keyStatementId = id + SelectKeyGenerator.SELECT_KEY_SUFFIX;
@@ -189,11 +224,13 @@ public class XMLStatementBuilder extends BaseBuilder {
     return true;
   }
 
+  //取得语言驱动
   private LanguageDriver getLanguageDriver(String lang) {
     Class<?> langClass = null;
     if (lang != null) {
       langClass = resolveClass(lang);
     }
+    //调用builderAssistant
     return builderAssistant.getLanguageDriver(langClass);
   }
 

@@ -105,6 +105,7 @@ public class XMLMapperBuilder extends BaseBuilder {
       bindMapperForNamespace();
     }
 
+    //还有没解析完的东东这里接着解析？  
     parsePendingResultMaps();
     parsePendingChacheRefs();
     parsePendingStatements();
@@ -128,30 +129,42 @@ public class XMLMapperBuilder extends BaseBuilder {
         throw new BuilderException("Mapper's namespace cannot be empty");
       }
       builderAssistant.setCurrentNamespace(namespace);
+      //2.配置cache-ref
       cacheRefElement(context.evalNode("cache-ref"));
+      //3.配置cache
       cacheElement(context.evalNode("cache"));
+      //4.配置parameterMap(已经废弃,老式风格的参数映射)
       parameterMapElement(context.evalNodes("/mapper/parameterMap"));
+      //5.配置resultMap(高级功能)
       resultMapElements(context.evalNodes("/mapper/resultMap"));
+      //6.配置sql(定义可重用的 SQL 代码段)
       sqlElement(context.evalNodes("/mapper/sql"));
+      //7.配置select|insert|update|delete TODO
       buildStatementFromContext(context.evalNodes("select|insert|update|delete"));
     } catch (Exception e) {
       throw new BuilderException("Error parsing Mapper XML. Cause: " + e, e);
     }
   }
 
+  //7.配置select|insert|update|delete
   private void buildStatementFromContext(List<XNode> list) {
+    //调用7.1构建语句
     if (configuration.getDatabaseId() != null) {
       buildStatementFromContext(list, configuration.getDatabaseId());
     }
     buildStatementFromContext(list, null);
   }
 
+  //7.1构建语句
   private void buildStatementFromContext(List<XNode> list, String requiredDatabaseId) {
     for (XNode context : list) {
+        //语句比较复杂，核心都在这里面，所以调用XMLStatementBuilder
       final XMLStatementBuilder statementParser = new XMLStatementBuilder(configuration, builderAssistant, context, requiredDatabaseId);
       try {
+          //核心XMLStatementBuilder.parseStatementNode
         statementParser.parseStatementNode();
       } catch (IncompleteElementException e) {
+          //如果出现SQL语句不完整，把它记下来，塞到configuration去
         configuration.addIncompleteStatement(statementParser);
       }
     }
@@ -202,8 +215,11 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
+  //2.配置cache-ref,在这样的 情况下你可以使用 cache-ref 元素来引用另外一个缓存。 
+//<cache-ref namespace="com.someone.application.data.SomeMapper"/>
   private void cacheRefElement(XNode context) {
     if (context != null) {
+      //增加cache-ref
       configuration.addCacheRef(builderAssistant.getCurrentNamespace(), context.getStringAttribute("namespace"));
       CacheRefResolver cacheRefResolver = new CacheRefResolver(builderAssistant, context.getStringAttribute("namespace"));
       try {
@@ -214,6 +230,12 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
+  //3.配置cache
+//  <cache
+//  eviction="FIFO"
+//  flushInterval="60000"
+//  size="512"
+//  readOnly="true"/>
   private void cacheElement(XNode context) throws Exception {
     if (context != null) {
       String type = context.getStringAttribute("type", "PERPETUAL");
@@ -223,11 +245,18 @@ public class XMLMapperBuilder extends BaseBuilder {
       Long flushInterval = context.getLongAttribute("flushInterval");
       Integer size = context.getIntAttribute("size");
       boolean readWrite = !context.getBooleanAttribute("readOnly", false);
+      //读入额外的配置信息，易于第三方的缓存扩展,例:
+//    <cache type="com.domain.something.MyCustomCache">
+//      <property name="cacheFile" value="/tmp/my-custom-cache.tmp"/>
+//    </cache>
       Properties props = context.getChildrenAsProperties();
+      //调用builderAssistant.useNewCache
       builderAssistant.useNewCache(typeClass, evictionClass, flushInterval, size, readWrite, props);
     }
   }
 
+  //4.配置parameterMap
+  //已经被废弃了!老式风格的参数映射。可以忽略
   private void parameterMapElement(List<XNode> list) throws Exception {
     for (XNode parameterMapNode : list) {
       String id = parameterMapNode.getStringAttribute("id");
@@ -255,9 +284,12 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
+  //5.配置resultMap,高级功能，可以先忽略
   private void resultMapElements(List<XNode> list) throws Exception {
+      //基本上就是循环把resultMap加入到Configuration里去,保持2份，一份缩略，一分全名
     for (XNode resultMapNode : list) {
       try {
+          //循环调resultMapElement
         resultMapElement(resultMapNode);
       } catch (IncompleteElementException e) {
         // ignore, it will be retried
@@ -265,19 +297,34 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
+  //5.1 配置resultMap
   private ResultMap resultMapElement(XNode resultMapNode) throws Exception {
     return resultMapElement(resultMapNode, Collections.<ResultMapping> emptyList());
   }
 
+  //5.1 配置resultMap
   private ResultMap resultMapElement(XNode resultMapNode, List<ResultMapping> additionalResultMappings) throws Exception {
+    //错误上下文
+//取得标示符   ("resultMap[userResultMap]")
+//    <resultMap id="userResultMap" type="User">
+//      <id property="id" column="user_id" />
+//      <result property="username" column="username"/>
+//      <result property="password" column="password"/>
+//    </resultMap>
     ErrorContext.instance().activity("processing " + resultMapNode.getValueBasedIdentifier());
     String id = resultMapNode.getStringAttribute("id",
         resultMapNode.getValueBasedIdentifier());
+    //一般拿type就可以了，后面3个难道是兼容老的代码？
     String type = resultMapNode.getStringAttribute("type",
         resultMapNode.getStringAttribute("ofType",
             resultMapNode.getStringAttribute("resultType",
                 resultMapNode.getStringAttribute("javaType"))));
+    //高级功能，还支持继承?
+//  <resultMap id="carResult" type="Car" extends="vehicleResult">
+//    <result property="doorCount" column="door_count" />
+//  </resultMap>
     String extend = resultMapNode.getStringAttribute("extends");
+    //autoMapping
     Boolean autoMapping = resultMapNode.getBooleanAttribute("autoMapping");
     Class<?> typeClass = resolveClass(type);
     Discriminator discriminator = null;
@@ -286,8 +333,10 @@ public class XMLMapperBuilder extends BaseBuilder {
     List<XNode> resultChildren = resultMapNode.getChildren();
     for (XNode resultChild : resultChildren) {
       if ("constructor".equals(resultChild.getName())) {
+        //解析result map的constructor
         processConstructorElement(resultChild, typeClass, resultMappings);
       } else if ("discriminator".equals(resultChild.getName())) {
+        //解析result map的discriminator
         discriminator = processDiscriminatorElement(resultChild, typeClass, resultMappings);
       } else {
         List<ResultFlag> flags = new ArrayList<ResultFlag>();
@@ -306,10 +355,15 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
+//解析result map的constructor
+//<constructor>
+//  <idArg column="blog_id" javaType="int"/>
+//</constructor>
   private void processConstructorElement(XNode resultChild, Class<?> resultType, List<ResultMapping> resultMappings) throws Exception {
     List<XNode> argChildren = resultChild.getChildren();
     for (XNode argChild : argChildren) {
       List<ResultFlag> flags = new ArrayList<ResultFlag>();
+      //结果标志加上ID和CONSTRUCTOR
       flags.add(ResultFlag.CONSTRUCTOR);
       if ("idArg".equals(argChild.getName())) {
         flags.add(ResultFlag.ID);
@@ -318,6 +372,10 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
+//解析result map的discriminator
+//<discriminator javaType="int" column="draft">
+//  <case value="1" resultType="DraftPost"/>
+//</discriminator>
   private Discriminator processDiscriminatorElement(XNode context, Class<?> resultType, List<ResultMapping> resultMappings) throws Exception {
     String column = context.getStringAttribute("column");
     String javaType = context.getStringAttribute("javaType");
@@ -336,6 +394,7 @@ public class XMLMapperBuilder extends BaseBuilder {
     return builderAssistant.buildDiscriminator(resultType, column, javaTypeClass, jdbcTypeEnum, typeHandlerClass, discriminatorMap);
   }
 
+  //6 配置sql(定义可重用的 SQL 代码段)
   private void sqlElement(List<XNode> list) throws Exception {
     if (configuration.getDatabaseId() != null) {
       sqlElement(list, configuration.getDatabaseId());
@@ -343,11 +402,14 @@ public class XMLMapperBuilder extends BaseBuilder {
     sqlElement(list, null);
   }
 
+  //6.1 配置sql
+//<sql id="userColumns"> id,username,password </sql>
   private void sqlElement(List<XNode> list, String requiredDatabaseId) throws Exception {
     for (XNode context : list) {
       String databaseId = context.getStringAttribute("databaseId");
       String id = context.getStringAttribute("id");
       id = builderAssistant.applyCurrentNamespace(id, false);
+      //比较简单，就是将sql片段放入hashmap,不过此时还没有解析sql片段
       if (databaseIdMatchesCurrent(id, databaseId, requiredDatabaseId)) sqlFragments.put(id, context);
     }
   }
@@ -362,8 +424,11 @@ public class XMLMapperBuilder extends BaseBuilder {
         return false;
       }
       // skip this fragment if there is a previous one with a not null databaseId
+      //如果有重名的id了
+      //<sql id="userColumns"> id,username,password </sql>
       if (this.sqlFragments.containsKey(id)) {
         XNode context = this.sqlFragments.get(id);
+        //如果之前那个重名的sql id有databaseId，则false，否则难道true？这样新的sql覆盖老的sql？？？
         if (context.getStringAttribute("databaseId") != null) {
           return false;
         }

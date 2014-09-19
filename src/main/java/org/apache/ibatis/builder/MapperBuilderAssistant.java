@@ -52,8 +52,13 @@ import org.apache.ibatis.type.TypeHandler;
 /**
  * @author Clinton Begin
  */
+/**
+ * 映射构建器助手，建造者模式,继承BaseBuilder
+ *
+ */
 public class MapperBuilderAssistant extends BaseBuilder {
 
+  //每个助手都有1个namespace,resource,cache
   private String currentNamespace;
   private String resource;
   private Cache currentCache;
@@ -119,8 +124,10 @@ public class MapperBuilderAssistant extends BaseBuilder {
       Integer size,
       boolean readWrite,
       Properties props) {
+      //这里面又判断了一下是否为null就用默认值，有点和XMLMapperBuilder.cacheElement逻辑重复了
     typeClass = valueOrDefault(typeClass, PerpetualCache.class);
     evictionClass = valueOrDefault(evictionClass, LruCache.class);
+    //调用CacheBuilder构建cache,id=currentNamespace
     Cache cache = new CacheBuilder(currentNamespace)
         .implementation(typeClass)
         .addDecorator(evictionClass)
@@ -129,7 +136,9 @@ public class MapperBuilderAssistant extends BaseBuilder {
         .readWrite(readWrite)
         .properties(props)
         .build();
+    //加入缓存
     configuration.addCache(cache);
+    //当前的缓存
     currentCache = cache;
     return cache;
   }
@@ -481,12 +490,16 @@ public class MapperBuilderAssistant extends BaseBuilder {
         nestedResultMap, notNullColumn, columnPrefix, typeHandler, flags, null, null, configuration.isLazyLoadingEnabled());
   }  
 
+  //取得语言驱动
   public LanguageDriver getLanguageDriver(Class<?> langClass) {
     if (langClass != null) {
+        //注册语言驱动
       configuration.getLanguageRegistry().register(langClass);
     } else {
+        //如果为null，则取得默认驱动（mybatis3.2以前大家一直用的方法）
       langClass = configuration.getLanguageRegistry().getDefaultDriverClass();
     }
+    //再去调configuration
     return configuration.getLanguageRegistry().getDriver(langClass);
   }
 

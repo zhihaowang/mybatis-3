@@ -84,7 +84,7 @@ public class XNode {
     return builder.toString();
   }
 
-	//取得标示符   (node[Java_Lang_String])
+	//取得标示符   ("resultMap[authorResult]")
 	//XMLMapperBuilder.resultMapElement调用
 //	<resultMap id="authorResult" type="Author">
 //	  <id property="id" column="author_id"/>
