@@ -158,7 +158,8 @@ public class XMLMapperBuilder extends BaseBuilder {
   //7.1构建语句
   private void buildStatementFromContext(List<XNode> list, String requiredDatabaseId) {
     for (XNode context : list) {
-        //语句比较复杂，核心都在这里面，所以调用XMLStatementBuilder
+      //构建所有语句,一个mapper下可以有很多select
+      //语句比较复杂，核心都在这里面，所以调用XMLStatementBuilder
       final XMLStatementBuilder statementParser = new XMLStatementBuilder(configuration, builderAssistant, context, requiredDatabaseId);
       try {
           //核心XMLStatementBuilder.parseStatementNode
@@ -284,7 +285,7 @@ public class XMLMapperBuilder extends BaseBuilder {
     }
   }
 
-  //5.配置resultMap,高级功能，可以先忽略
+  //5.配置resultMap,高级功能
   private void resultMapElements(List<XNode> list) throws Exception {
       //基本上就是循环把resultMap加入到Configuration里去,保持2份，一份缩略，一分全名
     for (XNode resultMapNode : list) {
@@ -343,9 +344,11 @@ public class XMLMapperBuilder extends BaseBuilder {
         if ("id".equals(resultChild.getName())) {
           flags.add(ResultFlag.ID);
         }
+        //调5.1.1 buildResultMappingFromContext,得到ResultMapping
         resultMappings.add(buildResultMappingFromContext(resultChild, typeClass, flags));
       }
     }
+    //最后再调ResultMapResolver得到ResultMap
     ResultMapResolver resultMapResolver = new ResultMapResolver(builderAssistant, id, typeClass, extend, discriminator, resultMappings, autoMapping);
     try {
       return resultMapResolver.resolve();
@@ -437,12 +440,16 @@ public class XMLMapperBuilder extends BaseBuilder {
     return true;
   }
 
+  //5.1.1 构建resultMap
   private ResultMapping buildResultMappingFromContext(XNode context, Class<?> resultType, List<ResultFlag> flags) throws Exception {
+	//<id property="id" column="author_id"/>
+	//<result property="username" column="author_username"/>
     String property = context.getStringAttribute("property");
     String column = context.getStringAttribute("column");
     String javaType = context.getStringAttribute("javaType");
     String jdbcType = context.getStringAttribute("jdbcType");
     String nestedSelect = context.getStringAttribute("select");
+    //处理嵌套的result map
     String nestedResultMap = context.getStringAttribute("resultMap",
         processNestedResultMappings(context, Collections.<ResultMapping> emptyList()));
     String notNullColumn = context.getStringAttribute("notNullColumn");
@@ -455,14 +462,23 @@ public class XMLMapperBuilder extends BaseBuilder {
     @SuppressWarnings("unchecked")
     Class<? extends TypeHandler<?>> typeHandlerClass = (Class<? extends TypeHandler<?>>) resolveClass(typeHandler);
     JdbcType jdbcTypeEnum = resolveJdbcType(jdbcType);
+    //又去调builderAssistant.buildResultMapping
     return builderAssistant.buildResultMapping(resultType, property, column, javaTypeClass, jdbcTypeEnum, nestedSelect, nestedResultMap, notNullColumn, columnPrefix, typeHandlerClass, flags, resulSet, foreignColumn, lazy);
   }
   
+  //5.1.1.1 处理嵌套的result map
   private String processNestedResultMappings(XNode context, List<ResultMapping> resultMappings) throws Exception {
+	  //处理association|collection|case
     if ("association".equals(context.getName())
         || "collection".equals(context.getName())
         || "case".equals(context.getName())) {
+    	
+//    	<resultMap id="blogResult" type="Blog">
+//    	  <association property="author" column="author_id" javaType="Author" select="selectAuthor"/>
+//    	</resultMap>
+//如果不是嵌套查询
       if (context.getStringAttribute("select") == null) {
+    	//则递归调用5.1 resultMapElement
         ResultMap resultMap = resultMapElement(context, resultMappings);
         return resultMap.getId();
       }

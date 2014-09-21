@@ -337,7 +337,8 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       final MetaObject metaObject = configuration.newMetaObject(resultObject);
       boolean foundValues = resultMap.getConstructorResultMappings().size() > 0;
       if (shouldApplyAutomaticMappings(resultMap, false)) {        
-        foundValues = applyAutomaticMappings(rsw, resultMap, metaObject, null) || foundValues;
+        //自动映射咯
+    	foundValues = applyAutomaticMappings(rsw, resultMap, metaObject, null) || foundValues;
       }
       foundValues = applyPropertyMappings(rsw, resultMap, metaObject, lazyLoader, null) || foundValues;
       foundValues = lazyLoader.size() > 0 || foundValues;
@@ -403,6 +404,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     }
   }
 
+  //自动映射咯
   private boolean applyAutomaticMappings(ResultSetWrapper rsw, ResultMap resultMap, MetaObject metaObject, String columnPrefix) throws SQLException {
     final List<String> unmappedColumnNames = rsw.getUnmappedColumnNames(resultMap, columnPrefix);
     boolean foundValues = false;
@@ -422,9 +424,11 @@ public class DefaultResultSetHandler implements ResultSetHandler {
         final Class<?> propertyType = metaObject.getSetterType(property);
         if (typeHandlerRegistry.hasTypeHandler(propertyType)) {
           final TypeHandler<?> typeHandler = rsw.getTypeHandler(propertyType, columnName);
+          //巧妙的用TypeHandler取得结果
           final Object value = typeHandler.getResult(rsw.getResultSet(), columnName);
           if (value != null || configuration.isCallSettersOnNulls()) { // issue #377, call setter on nulls
             if (value != null || !propertyType.isPrimitive()) {
+              //然后巧妙的用反射来设置到对象
               metaObject.setValue(property, value);
             }
             foundValues = true;
@@ -528,6 +532,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
       final List<ResultMapping> propertyMappings = resultMap.getPropertyResultMappings();
       for (ResultMapping propertyMapping : propertyMappings) {
         if (propertyMapping.getNestedQueryId() != null && propertyMapping.isLazy()) { // issue gcode #109 && issue #149
+          //TODO 使用代理(cglib/javaassist)
           return configuration.getProxyFactory().createProxy(resultObject, lazyLoader, configuration, objectFactory, constructorArgTypes, constructorArgs);
         }
       }
@@ -535,18 +540,22 @@ public class DefaultResultSetHandler implements ResultSetHandler {
     return resultObject;
   }
 
+  //创建结果对象
   private Object createResultObject(ResultSetWrapper rsw, ResultMap resultMap, List<Class<?>> constructorArgTypes, List<Object> constructorArgs, String columnPrefix)
       throws SQLException {
+	//得到result type
     final Class<?> resultType = resultMap.getType();
     final MetaClass metaType = MetaClass.forClass(resultType);
     final List<ResultMapping> constructorMappings = resultMap.getConstructorResultMappings();
     if (typeHandlerRegistry.hasTypeHandler(resultType)) {
+      //基本型
       return createPrimitiveResultObject(rsw, resultMap, columnPrefix);
     } else if (constructorMappings.size() > 0) {
       return createParameterizedResultObject(rsw, resultType, constructorMappings, constructorArgTypes, constructorArgs, columnPrefix);
     } else if (resultType.isInterface() || metaType.hasDefaultConstructor()) {
       return objectFactory.create(resultType);
     } else if (shouldApplyAutomaticMappings(resultMap, false)) {
+      //自动映射
       return createByConstructorSignature(rsw, resultType, constructorArgTypes, constructorArgs, columnPrefix);
     }
     throw new ExecutorException("Do not know how to create an instance of " + resultType);
@@ -589,6 +598,7 @@ public class DefaultResultSetHandler implements ResultSetHandler {
           constructorArgs.add(value);
           foundValues = value != null || foundValues;
         }
+        //上面是构造函数创建对象，下面是对象工厂来创建
         return foundValues ? objectFactory.create(resultType, constructorArgTypes, constructorArgs) : null;
       }
     }

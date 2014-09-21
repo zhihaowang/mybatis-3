@@ -31,19 +31,25 @@ import org.apache.ibatis.session.Configuration;
 /**
  * @author Eduardo Macarron
  */
+/**
+ * XML语言驱动
+ */
 public class XMLLanguageDriver implements LanguageDriver {
 
   @Override
   public ParameterHandler createParameterHandler(MappedStatement mappedStatement, Object parameterObject, BoundSql boundSql) {
-    return new DefaultParameterHandler(mappedStatement, parameterObject, boundSql);
+    //返回默认的参数处理器
+	return new DefaultParameterHandler(mappedStatement, parameterObject, boundSql);
   }
 
   @Override
   public SqlSource createSqlSource(Configuration configuration, XNode script, Class<?> parameterType) {
+	//用XML脚本构建器解析
     XMLScriptBuilder builder = new XMLScriptBuilder(configuration, script, parameterType);
     return builder.parseScriptNode();
   }
 
+  //注解方式构建mapper，一般不用，可以暂时忽略
   @Override
   public SqlSource createSqlSource(Configuration configuration, String script, Class<?> parameterType) {
     if (script.startsWith("<script>")) { // issue #3
@@ -52,6 +58,7 @@ public class XMLLanguageDriver implements LanguageDriver {
     } else {
       script = PropertyParser.parse(script, configuration.getVariables()); // issue #127
       TextSqlNode textSqlNode = new TextSqlNode(script);
+      //一种是动态，一种是原始
       if (textSqlNode.isDynamic()) {
         return new DynamicSqlSource(configuration, textSqlNode);
       } else {

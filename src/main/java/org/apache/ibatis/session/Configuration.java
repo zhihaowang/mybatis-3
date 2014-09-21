@@ -149,7 +149,7 @@ public class Configuration {
   protected final TypeAliasRegistry typeAliasRegistry = new TypeAliasRegistry();
   protected final LanguageDriverRegistry languageRegistry = new LanguageDriverRegistry();
 
-  //映射上的语句,存在Map里
+  //映射的语句,存在Map里
   protected final Map<String, MappedStatement> mappedStatements = new StrictMap<MappedStatement>("Mapped Statements collection");
   //缓存,存在Map里
   protected final Map<String, Cache> caches = new StrictMap<Cache>("Caches collection");

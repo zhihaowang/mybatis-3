@@ -48,7 +48,7 @@ public class DynamicSqlSource implements SqlSource {
 	//调用SqlSourceBuilder
     SqlSourceBuilder sqlSourceParser = new SqlSourceBuilder(configuration);
     Class<?> parameterType = parameterObject == null ? Object.class : parameterObject.getClass();
-	//SqlSourceBuilder.parse,注意这里返回的是StaticSqlSource
+	//SqlSourceBuilder.parse,注意这里返回的是StaticSqlSource,解析完了就把那些参数都替换成?了，也就是最基本的JDBC的SQL写法
     SqlSource sqlSource = sqlSourceParser.parse(context.getSql(), parameterType, context.getBindings());
 	//看似是又去递归调用SqlSource.getBoundSql，其实因为是StaticSqlSource，所以没问题，不是递归调用
     BoundSql boundSql = sqlSource.getBoundSql(parameterObject);
